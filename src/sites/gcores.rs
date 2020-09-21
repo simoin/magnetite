@@ -2,10 +2,37 @@ use libxml::parser::Parser;
 use libxml::tree::Node;
 use libxml::xpath::Context;
 
-use crate::{gcores, http};
+use crate::{http, sites::Other};
 use actix_web::{HttpResponse, Responder};
 use chrono::Utc;
 use rss::{Channel, ChannelBuilder, Item, ItemBuilder};
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Root {
+    pub data: Data,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Data {
+    pub attributes: Attributes,
+    #[serde(flatten)]
+    other: Other,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Attributes {
+    pub title: String,
+    pub content: String,
+    pub cover: Option<String>,
+    pub thumb: String,
+    #[serde(flatten)]
+    other: Other,
+}
 
 pub async fn gcores() -> impl Responder {
     let base_url = "https://www.gcores.com";
@@ -42,7 +69,7 @@ pub async fn gcores() -> impl Responder {
             let api_url = format!("https://www.gcores.com/gapi/v1{}?include=media", url);
             let resp = http::get(api_url.as_str()).send().unwrap();
 
-            let json = resp.json::<gcores::Root>().unwrap();
+            let json = resp.json::<Root>().unwrap();
 
             let parser = Parser::default_html();
             let article_resp = http::get(&article_url).send().unwrap();
