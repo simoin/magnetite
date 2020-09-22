@@ -1,31 +1,28 @@
-use libxml::parser::Parser;
-use libxml::tree::Node;
-use libxml::xpath::Context;
-
-use crate::{http, sites::Other};
-use actix_web::{HttpResponse, Responder};
+use actix_web::{get, http, HttpResponse, web};
+use anyhow::Result;
 use chrono::Utc;
-use rss::{Channel, ChannelBuilder, Item, ItemBuilder};
-
+use libxml::{parser::Parser, tree::Node, xpath::Context};
+use rss::{Channel, ChannelBuilder, Guid, Item, ItemBuilder};
 use serde::{Deserialize, Serialize};
 
+use crate::{CLIENT, sites::Other, util::remove_node};
+
+const BASE_URL: &str = "https://www.gcores.com";
+
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Root {
+struct GApiResp {
     pub data: Data,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Data {
+struct Data {
     pub attributes: Attributes,
     #[serde(flatten)]
     other: Other,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Attributes {
+struct Attributes {
     pub title: String,
     pub content: String,
     pub cover: Option<String>,
@@ -34,136 +31,142 @@ pub struct Attributes {
     other: Other,
 }
 
-pub async fn gcores() -> impl Responder {
-    let base_url = "https://www.gcores.com";
+pub async fn get_item(url: String, title: String) -> Result<Item> {
+    let item_url = format!("{}{}", BASE_URL, url);
+    println!("{}", item_url);
+    let api_url = format!("https://www.gcores.com/gapi/v1{}?include=media", url);
+    let gapi_resp = CLIENT
+        .get(&api_url)
+        .send()
+        .await?
+        .json::<GApiResp>()
+        .await?;
 
     let parser = Parser::default_html();
-    let resp = http::get("https://www.gcores.com/articles").send().unwrap();
-    let doc = parser.parse_string(resp.as_str().unwrap()).unwrap();
-    let context = Context::new(&doc).unwrap();
-    let articles_node = context
-        .evaluate("//div[@class='original am_card original-normal original-article']")
+    let article_resp = CLIENT
+        .get(&item_url)
+        .send()
+        .await
         .unwrap()
-        .get_nodes_as_vec();
+        .bytes()
+        .await
+        .unwrap();
+    let doc = parser.parse_string(article_resp).unwrap();
+    let context = Context::new(&doc).unwrap();
 
-    let items = articles_node
-        .iter()
-        .map(|node| {
-            let url = node
-                .findnodes(".//a[@class='original_imgArea_cover']/@href")
-                .unwrap()
-                .first()
-                .unwrap()
-                .get_content();
-            let title = node
-                .findnodes(".//a[@class='am_card_content original_content']/h3/text()")
-                .unwrap()
-                .first()
-                .unwrap()
-                .get_content();
-            (url, title)
-        })
-        .map(|(url, title)| {
-            let article_url = format!("{}{}", base_url, url);
-            println!("{}", article_url);
-            let api_url = format!("https://www.gcores.com/gapi/v1{}?include=media", url);
-            let resp = http::get(api_url.as_str()).send().unwrap();
-
-            let json = resp.json::<Root>().unwrap();
-
-            let parser = Parser::default_html();
-            let article_resp = http::get(&article_url).send().unwrap();
-            let article_resp = article_resp.as_str().unwrap();
-            let doc = parser.parse_string(article_resp).unwrap();
-            let context = Context::new(&doc).unwrap();
-
-            let json: serde_json::Value =
-                serde_json::from_str(&json.data.attributes.content).unwrap();
-            let entity_map = if let serde_json::Value::Object(map) = json {
-                map.get("entityMap").unwrap().clone()
-            } else {
-                panic!()
-            };
-            let images: Vec<(String, String)> =
-                entity_map
-                    .as_object()
+    let attr_content: serde_json::Value = serde_json::from_str(&gapi_resp.data.attributes.content).unwrap();
+    let entity_map = if let serde_json::Value::Object(map) = attr_content {
+        map.get("entityMap").unwrap().to_owned()
+    } else {
+        panic!()
+    };
+    let images: Vec<(String, String)> =
+        entity_map
+            .as_object()
+            .unwrap()
+            .values()
+            .fold(Vec::new(), |mut v, value| {
+                if value
+                    .pointer("/type")
                     .unwrap()
-                    .values()
-                    .fold(Vec::new(), |mut v, value| {
-                        if value
-                            .pointer("/type")
+                    .as_str()
+                    .unwrap()
+                    .eq("IMAGE")
+                {
+                    let cap = if let Some(c) = value.pointer("/data/caption") {
+                        c.as_str().unwrap()
+                    } else {
+                        ""
+                    };
+                    let src = if let Some(path) = value.pointer("/data/path") {
+                        format!("https://image.gcores.com/{}", path.as_str().unwrap())
+                    } else {
+                        value
+                            .pointer("/data/src")
                             .unwrap()
                             .as_str()
                             .unwrap()
-                            .eq("IMAGE")
-                        {
-                            let cap = if let Some(c) = value.pointer("/data/caption") {
-                                c.as_str().unwrap()
-                            } else {
-                                ""
-                            };
-                            let src = if let Some(path) = value.pointer("/data/path") {
-                                format!("https://image.gcores.com/{}", path.as_str().unwrap())
-                            } else {
-                                value
-                                    .pointer("/data/src")
-                                    .unwrap()
-                                    .as_str()
-                                    .unwrap()
-                                    .to_owned()
-                            };
-                            v.push((cap.to_owned(), src));
-                        }
-                        v
-                    });
+                            .to_owned()
+                    };
+                    v.push((cap.to_owned(), src));
+                }
+                v
+            });
 
-            context
-                .evaluate("//figure")
-                .unwrap()
-                .get_nodes_as_vec()
-                .into_iter()
-                .enumerate()
-                .for_each(|(index, node)| {
-                    if let Some(image) = images.get(index) {
-                        let mut parent = node.get_parent().unwrap();
-                        let mut new_node = Node::new("img", None, &doc).unwrap();
-                        new_node.set_attribute("src", &image.1).unwrap();
-                        parent.replace_child_node(new_node, node).unwrap();
-                    }
-                });
+    let figures = context.evaluate("//figure").unwrap().get_nodes_as_vec();
+    for (index, node) in figures.into_iter().enumerate() {
+        if let Some(image) = images.get(index) {
+            let mut parent = node.get_parent().unwrap();
+            let mut new_node = Node::new("img", None, &doc).unwrap();
+            new_node.set_attribute("src", &image.1).unwrap();
+            parent.replace_child_node(new_node, node).unwrap();
+        }
+    }
 
-            // remove md-editor-toolbar
-            context
-                .evaluate("//div[@class='md-editor-toolbar']")
-                .unwrap()
-                .get_nodes_as_vec()
-                .into_iter()
-                .for_each(|mut node| node.unlink());
-            context
-                .evaluate("//*[@class='story_hidden']")
-                .unwrap()
-                .get_nodes_as_vec()
-                .into_iter()
-                .for_each(|mut node| node.unlink());
+    // remove md-editor-toolbar
+    remove_node(&context, "//div[@class='md-editor-toolbar']");
+    remove_node(&context, "//*[@class='story_hidden']");
+    remove_node(&context, "//svg");
 
-            let content = context
-                .evaluate("//div[@class='story story-show']")
-                .unwrap()
-                .get_nodes_as_vec();
+    let content = context
+        .evaluate("//div[@class='story story-show']")
+        .unwrap()
+        .get_nodes_as_vec();
 
-            let item = ItemBuilder::default()
-                .title(title)
-                .link(article_url)
-                .description(format!("{}", doc.node_to_string(&content[0])))
-                .build()
-                .unwrap();
-            item
-        })
-        .collect::<Vec<Item>>();
+    let mut guid = Guid::default();
+    guid.set_permalink(false);
+    guid.set_value(&item_url);
+
+    Ok(ItemBuilder::default()
+        .title(title)
+        .link(item_url)
+        .description(format!("{}", doc.node_to_string(&content[0])))
+        .guid(guid)
+        .build()
+        .unwrap())
+}
+
+#[get("/gcores/{category}")]
+pub async fn gcores(category: web::Path<(String, )>) -> HttpResponse {
+    println!("{:?}", category);
+    let resp = CLIENT
+        .get(&format!("{}/{}", BASE_URL, category.into_inner().0))
+        .send()
+        .await
+        .unwrap()
+        .bytes()
+        .await
+        .unwrap();
+    let parser = Parser::default_html();
+    let doc = parser.parse_string(resp).unwrap();
+    let context = Context::new(&doc).unwrap();
+    let item_node = context
+        .evaluate("//div[contains(@class,'original-normal') and contains(@class,'am_card')]")
+        .unwrap()
+        .get_nodes_as_vec();
+    println!("get home page");
+    let mut items = Vec::new();
+    for node in item_node {
+        let url = node
+            .findnodes(".//a[@class='original_imgArea_cover']/@href")
+            .unwrap()
+            .first()
+            .unwrap()
+            .get_content();
+        let title = node
+            .findnodes(".//a[@class='am_card_content original_content']/h3/text()")
+            .unwrap()
+            .first()
+            .unwrap()
+            .get_content();
+
+        let item = get_item(url, title).await.unwrap();
+        items.push(item);
+    }
 
     let channel: Channel = ChannelBuilder::default()
         .title("Gcores")
-        .link(base_url)
+        .link(BASE_URL)
         .description("Rsshub-RS")
         .language("zh-cn".to_string())
         .generator("Rsshub-RS".to_string())
@@ -174,6 +177,6 @@ pub async fn gcores() -> impl Responder {
         .unwrap();
 
     HttpResponse::Ok()
-        .header("content-type", "application/xml")
+        .header(http::header::CONTENT_TYPE, "application/xml")
         .body(channel.to_string())
 }
