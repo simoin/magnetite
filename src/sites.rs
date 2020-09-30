@@ -4,8 +4,6 @@ use rss::{Channel, ChannelBuilder, Item};
 
 pub mod gcores;
 
-type Other = serde_json::Map<String, serde_json::Value>;
-
 fn channel(title: String, url: String, items: Vec<Item>) -> Channel {
     ChannelBuilder::default()
         .title(title)

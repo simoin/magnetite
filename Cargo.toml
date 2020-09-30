@@ -15,13 +15,11 @@ actix-web = "3"
 lazy_static = "1.4.0"
 libxml = { git = "https://github.com/simoin/rust-libxml.git", branch = "win" }
 
-reqwest = { version = "0.10", features = ["json", "cookies"] }
+reqwest = { version = "0.10", features = ["cookies"] }
+ajson = "0.2.3"
 
 chrono = "0.4.15"
 rss = "1.9.0"
-
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 
 lru = { version = "0.6.0", optional = true }
 redis = { version = "0.17.0", optional = true, features=["r2d2"] }
