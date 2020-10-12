@@ -1,17 +1,17 @@
 use actix_web::{get, http, web, HttpResponse};
 use anyhow::Result;
 use libxml::xpath::Context;
-use rss::{Guid, Item, ItemBuilder};
+use rss::{Channel, Item};
 
 use crate::cache::CACHE;
 use crate::error::Error;
-use crate::sites::channel;
+use crate::sites::{channel, item};
 use crate::util::{doc, new_img_node};
 use crate::{util::remove_node, CLIENT};
 
 const BASE_URL: &str = "https://www.gcores.com";
 
-pub async fn get_item(
+async fn get_item(
     url: String,
     title: String,
 ) -> std::result::Result<Item, Box<dyn std::error::Error>> {
@@ -49,6 +49,7 @@ pub async fn get_item(
                     let src = img.get("data.src").unwrap();
                     src.as_str().to_owned()
                 };
+                let src = format!("https://image.gcores.com/{}", src);
                 (caption, src)
             })
             .collect::<Vec<_>>()
@@ -73,30 +74,11 @@ pub async fn get_item(
         .unwrap()
         .get_nodes_as_vec();
 
-    let mut guid = Guid::default();
-    guid.set_permalink(false);
-    guid.set_value(&item_url);
-
-    Ok(ItemBuilder::default()
-        .title(title)
-        .link(item_url)
-        .description(format!("{}", doc.node_to_string(&content[0])))
-        .guid(guid)
-        .build()
-        .unwrap())
+    Ok(item(title, item_url, doc.node_to_string(&content[0])))
 }
 
-#[get("/gcores/{category}")]
-pub async fn gcores(category: web::Path<(String,)>) -> Result<HttpResponse, Error> {
-    println!("{:?}", category);
-    let url = format!("{}/{}", BASE_URL, category.into_inner().0);
-    if let Some(channel) = CACHE.try_get(&url) {
-        eprintln!("got cache");
-        return Ok(HttpResponse::Ok()
-            .header(http::header::CONTENT_TYPE, "application/xml")
-            .body(channel.to_string()));
-    }
-    let resp = CLIENT.get(&url).send().await?.bytes().await?;
+async fn get_channel(url: &str) -> std::result::Result<Channel, Error> {
+    let resp = CLIENT.get(url).send().await?.bytes().await?;
     let doc = doc(resp);
     let context = Context::new(&doc).unwrap();
     let item_node = context
@@ -131,8 +113,15 @@ pub async fn gcores(category: web::Path<(String,)>) -> Result<HttpResponse, Erro
         items.push(item);
     }
 
-    let channel = channel(title, url.clone(), items);
-    CACHE.set(&url, &channel);
+    Ok(channel(title, url.to_owned(), items))
+}
+
+#[get("/gcores/{category}")]
+pub async fn gcores(category: web::Path<(String,)>) -> Result<HttpResponse, Error> {
+    println!("{:?}", category);
+    let url = format!("{}/{}", BASE_URL, category.into_inner().0);
+
+    let channel = CACHE.try_get(&url, get_channel).await?;
 
     Ok(HttpResponse::Ok()
         .header(http::header::CONTENT_TYPE, "application/xml")

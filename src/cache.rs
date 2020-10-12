@@ -1,10 +1,12 @@
 use lru::LruCache;
 
 use crate::config::CACHE_EXPIRE;
+use crate::error::Error;
 use cfg_if::cfg_if;
 use chrono::Utc;
 use lazy_static::lazy_static;
 use rss::Channel;
+use std::future::Future;
 use std::ops::Deref;
 use std::sync::RwLock;
 
@@ -39,7 +41,18 @@ cfg_if! {
             }
         }
         impl Cache {
-            pub fn try_get(&self, key: &String) -> Option<Channel> {
+            pub async fn try_get<'a, F>(&self, key: &'a String, f: impl Fn(&'a str) -> F) -> F::Output
+                where F: Future<Output=std::result::Result<Channel, Error>> + 'a {
+                if let Some(channel) = self.get(key) {
+                    return Ok(channel);
+                }
+
+                let channel = f(key).await?;
+                self.set(key, &channel);
+                Ok(channel)
+            }
+
+            pub fn get(&self, key: &String) -> Option<Channel> {
                 let mut cache = self.write().unwrap();
                 if let Some(item) = (*cache).get(key) {
                     if Utc::now().timestamp() < item.expire {
@@ -56,6 +69,12 @@ cfg_if! {
             }
         }
     } else {
-        pub struct Cache(RedisConnection);
+
+        // pub struct Cache(RedisConnection);
+        //
+        // impl Cache {
+        //     pub fn get(&self) {}
+        //     pub fn set(&self) {}
+        // }
     }
 }
