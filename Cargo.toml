@@ -5,8 +5,6 @@ authors = ["simoin <lfzeng34@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-cfg-if = "0.1.10"
-
 thiserror = "1.0"
 anyhow = "1.0"
 

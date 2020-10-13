@@ -121,7 +121,7 @@ pub async fn gcores(category: web::Path<(String,)>) -> Result<HttpResponse, Erro
     println!("{:?}", category);
     let url = format!("{}/{}", BASE_URL, category.into_inner().0);
 
-    let channel = CACHE.try_get(&url, get_channel).await?;
+    let channel = CACHE.try_get_channel(&url, get_channel).await?;
 
     Ok(HttpResponse::Ok()
         .header(http::header::CONTENT_TYPE, "application/xml")

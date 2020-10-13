@@ -2,6 +2,11 @@ use libxml::parser::Parser;
 use libxml::tree::{Document, Node};
 use libxml::xpath::Context;
 
+pub fn ajson_get_string(json: &str, xpath: &str) -> String {
+    let data = ajson::get(json, xpath).unwrap();
+    data.as_str().to_owned()
+}
+
 pub fn remove_node(ctx: &Context, xpath: &str) {
     ctx.evaluate(xpath)
         .unwrap()
