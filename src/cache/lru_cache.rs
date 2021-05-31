@@ -9,11 +9,8 @@ use rss::Channel;
 use std::future::Future;
 use std::sync::RwLock;
 
-lazy_static! {
-    pub static ref CACHE: Cache = Cache::new();
-}
 
-pub struct Cache {
+pub struct RssCache {
     channel: RwLock<LruCache<String, CachedChannel>>,
     resp: RwLock<LruCache<String, CachedResponse>>,
 }
@@ -48,18 +45,16 @@ impl CachedResponse {
     }
 }
 
-impl Cache {
-    fn new() -> Self {
-        Cache {
+impl RssCache {
+    pub fn new() -> Self {
+        RssCache {
             channel: RwLock::new(LruCache::new(20)),
             resp: RwLock::new(LruCache::new(20)),
         }
     }
 
     pub async fn try_get_channel<'a, F>(
-        &self,
-        key: &'a String,
-        f: impl Fn(&'a str) -> F,
+        &self, key: &'a String, f: impl Fn(&'a str) -> F,
     ) -> F::Output
     where
         F: Future<Output = std::result::Result<Channel, Error>> + 'a,
@@ -89,13 +84,9 @@ impl Cache {
         cache.put(key.to_owned(), value);
     }
 
-    pub async fn try_get_resp<'a, F>(
-        &self,
-        key: &'a String,
-        f: impl Fn(&'a str) -> F,
-    ) -> F::Output
-        where
-            F: Future<Output = std::result::Result<String, Error>> + 'a,
+    pub async fn try_get_resp<'a, F>(&self, key: &'a String, f: impl Fn(&'a str) -> F) -> F::Output
+    where
+        F: Future<Output = std::result::Result<String, Error>> + 'a,
     {
         if let Some(resp) = self.get_resp(key) {
             return Ok(resp);

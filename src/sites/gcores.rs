@@ -3,7 +3,7 @@ use anyhow::Result;
 use libxml::xpath::Context;
 use rss::{Channel, Item};
 
-use crate::cache::CACHE;
+use crate::cache::{RssCache};
 use crate::error::Error;
 use crate::sites::{channel, item};
 use crate::util::{doc, new_img_node};
@@ -12,8 +12,7 @@ use crate::{util::remove_node, CLIENT};
 const BASE_URL: &str = "https://www.gcores.com";
 
 async fn get_item(
-    url: String,
-    title: String,
+    url: String, title: String,
 ) -> std::result::Result<Item, Box<dyn std::error::Error>> {
     let item_url = format!("{}{}", BASE_URL, url);
     println!("{}", item_url);
@@ -69,10 +68,7 @@ async fn get_item(
     remove_node(&context, "//*[@class='story_hidden']");
     remove_node(&context, "//svg");
 
-    let content = context
-        .evaluate("//div[@class='story story-show']")
-        .unwrap()
-        .get_nodes_as_vec();
+    let content = context.evaluate("//div[@class='story story-show']").unwrap().get_nodes_as_vec();
 
     Ok(item(title, item_url, doc.node_to_string(&content[0])))
 }
@@ -117,11 +113,17 @@ async fn get_channel(url: &str) -> std::result::Result<Channel, Error> {
 }
 
 #[get("/gcores/{category}")]
-pub async fn gcores(category: web::Path<(String,)>) -> Result<HttpResponse, Error> {
+pub async fn gcores(category: web::Path<(String,)>, cache: web::Data<RssCache>) -> Result<HttpResponse, Error> {
     println!("{:?}", category);
-    let url = format!("{}/{}", BASE_URL, category.into_inner().0);
+    let category = category.into_inner().0;
+    let url = format!("{}/{}", BASE_URL, &category);
+    let key = format!("/gcores/{}", &category);
 
-    let channel = CACHE.try_get_channel(&url, get_channel).await?;
+    let channel = get_channel(&url).await?;
+
+
+    // let channel = CACHE.try_get_channel(&url, get_channel).await?;
+    cache.set_channel(&key, &channel);
 
     Ok(HttpResponse::Ok()
         .header(http::header::CONTENT_TYPE, "application/xml")

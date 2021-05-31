@@ -8,10 +8,14 @@ edition = "2018"
 thiserror = "1.0"
 anyhow = "1.0"
 
+#pin-project = "0.4"
+
+futures = "0.3.5"
+actix-service = "1.0"
 actix-web = "3"
 
 lazy_static = "1.4.0"
-libxml = { git = "https://github.com/simoin/rust-libxml.git", branch = "win" }
+libxml = "0.2.17"
 
 reqwest = { version = "0.10", features = ["cookies"] }
 ajson = "0.2.3"

@@ -898,6 +898,7 @@ checksum = "1e05b85ec287aac0dc34db7d4a569323df697f9c55b99b15d6b4ef8cde49f613"
 dependencies = [
  "futures-channel",
  "futures-core",
+ "futures-executor",
  "futures-io",
  "futures-sink",
  "futures-task",
@@ -919,6 +920,17 @@ name = "futures-core"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59f5fff90fd5d971f936ad674802482ba441b6f09ba5e15fd8b39145582ca399"
+
+[[package]]
+name = "futures-executor"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10d6bb888be1153d3abeb9006b11b02cf5e9b209fda28693c31ae1e4e012e314"
+dependencies = [
+ "futures-core",
+ "futures-task",
+ "futures-util",
+]
 
 [[package]]
 name = "futures-io"
@@ -1288,8 +1300,9 @@ checksum = "f2f96b10ec2560088a8e76961b00d47107b3a625fecb76dedb29ee7ccbf98235"
 
 [[package]]
 name = "libxml"
-version = "0.2.14"
-source = "git+https://github.com/simoin/rust-libxml.git?branch=win#781cc17a14e97a056052b1857f7dfcbe75227945"
+version = "0.2.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "496410f67173a59f4e98954c4e7fabe96f6707d46c5f781eb01d96b2703ea6fc"
 dependencies = [
  "libc",
  "pkg-config",
@@ -1342,10 +1355,12 @@ dependencies = [
 name = "magnetite_rs"
 version = "0.1.0"
 dependencies = [
+ "actix-service",
  "actix-web",
  "ajson",
  "anyhow",
  "chrono",
+ "futures",
  "lazy_static",
  "libxml",
  "lru",
