@@ -7,7 +7,10 @@ use magnetite_rs::rss_service;
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let rss_store = DashMapActor::with_capacity(20).start(4);
-    let rss_storage = Storage::build().store(rss_store).format(Format::Json).finish();
+    let rss_storage = Storage::build()
+        .store(rss_store)
+        .format(Format::Json)
+        .finish();
 
     HttpServer::new(move || {
         App::new()

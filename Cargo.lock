@@ -1472,7 +1472,6 @@ dependencies = [
  "ajson",
  "anyhow",
  "chrono",
- "dashmap",
  "futures",
  "lazy_static",
  "libxml",

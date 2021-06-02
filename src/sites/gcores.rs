@@ -6,8 +6,7 @@ use anyhow::Result;
 use libxml::xpath::Context;
 use rss::{Channel, Item};
 
-use crate::cache::lru_cache::CachedChannel;
-// use crate::cache::RssCache;
+use crate::cache::CachedChannel;
 use crate::error::Error;
 use crate::sites::{channel, item};
 use crate::util::{doc, new_img_node};
