@@ -1,4 +1,4 @@
-#[cfg(any(feature = "memory", feature = "redis-cache"))]
+#[cfg(any(feature = "memory", feature = "redis"))]
 pub mod cache;
 mod config;
 mod error;

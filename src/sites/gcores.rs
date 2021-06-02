@@ -1,16 +1,16 @@
 // use std::sync::Mutex;
 
 use actix_storage::Storage;
-use actix_web::{get, http, web, HttpResponse};
+use actix_web::{get, http, HttpResponse, web};
 use anyhow::Result;
 use libxml::xpath::Context;
 use rss::{Channel, Item};
 
+use crate::CLIENT;
 use crate::cache::CachedChannel;
 use crate::error::Error;
 use crate::sites::{channel, item};
-use crate::util::{doc, new_img_node};
-use crate::{util::remove_node, CLIENT};
+use crate::util::{doc, new_img_node, remove_node};
 
 const BASE_URL: &str = "https://www.gcores.com";
 
@@ -122,7 +122,7 @@ async fn get_channel(url: &str) -> std::result::Result<Channel, Error> {
 
 #[get("/gcores/{category}")]
 pub async fn gcores(
-    category: web::Path<(String,)>,
+    category: web::Path<(String, )>,
     // cache: web::Data<Mutex<RssCache>>,
     storage: Storage,
 ) -> Result<HttpResponse, Error> {

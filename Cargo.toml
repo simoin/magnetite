@@ -25,12 +25,11 @@ chrono = "0.4.15"
 rss = {version = "1.10.0", features = ["with-serde"] }
 
 actix-storage = { version = "0.2.0", features=["serde-json"] }
-actix-storage-dashmap = { version = "0.2.0", features=["actor"] }
-#dashmap = { version = "4.0.2", optional = true }
-redis = { version = "0.17.0", optional = true, features=["r2d2"] }
+actix-storage-dashmap = { version = "0.2.0", features=["actor"], optional = true }
+actix-storage-redis = { version = "0.2.0", features=["tls"] , optional = true}
 
 [features]
-default = ["memory"]
+default = ["redis"]
 
-memory = []
-redis-cache = ["redis"]
+memory = ["actix-storage-dashmap"]
+redis = ["actix-storage-redis"]
