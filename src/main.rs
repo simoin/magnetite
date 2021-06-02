@@ -1,9 +1,7 @@
 use std::sync::Mutex;
 
-use actix_service::Service;
 use actix_web::{App, HttpServer};
 use actix_web::web::Data;
-use futures::FutureExt;
 
 use magnetite_rs::cache::RssCache;
 use magnetite_rs::middleware::Cache;

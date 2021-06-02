@@ -131,7 +131,6 @@ pub async fn gcores(
     let channel = get_channel(&url).await?;
 
     let mut cache = cache.lock().unwrap();
-    println!("set cache. key:{}", &key);
     cache.set_channel(&key, &channel);
 
     Ok(HttpResponse::Ok()

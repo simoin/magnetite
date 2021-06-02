@@ -49,12 +49,9 @@ where
 
     fn call(&mut self, req: Self::Request) -> Self::Future {
         let key = req.path().to_string();
-        eprintln!("key = {:#?}", key);
         let cache = req.app_data::<Data<Mutex<RssCache>>>().unwrap().to_owned();
         let mut cache = cache.lock().unwrap();
-        println!("cache len: {}", cache.channel.len());
         if let Some(channel) = cache.get_channel(&key) {
-            eprintln!("get cache");
             Either::Right(ok(req.into_response(
                 HttpResponse::Ok()
                     .header(http::header::CONTENT_TYPE, "application/xml")
@@ -62,7 +59,6 @@ where
                     .into_body(),
             )))
         } else {
-            eprintln!("no cache");
             Either::Left(self.service.call(req))
         }
     }
