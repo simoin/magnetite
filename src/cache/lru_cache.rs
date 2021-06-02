@@ -1,13 +1,15 @@
+use std::future::Future;
+
+use chrono::Utc;
+use dashmap::DashMap;
+use rss::Channel;
+
 use crate::config::CACHE_EXPIRE;
 use crate::error::Error;
 
-use chrono::Utc;
-use lru::LruCache;
-use rss::Channel;
-
-use std::future::Future;
-
-pub struct RssCache(LruCache<String, CachedChannel>);
+pub struct RssCache {
+    inner: DashMap<String, CachedChannel>,
+}
 // pub struct RssCache {
 //     pub channel: LruCache<String, CachedChannel>,
 //     // resp: LruCache<String, CachedResponse>,
@@ -43,7 +45,9 @@ impl CachedChannel {
 
 impl RssCache {
     pub fn new() -> Self {
-            RssCache(LruCache::new(20))
+        RssCache {
+            inner: DashMap::with_capacity(20)
+        }
     }
 
     pub async fn try_get_channel<'a, F>(
@@ -51,8 +55,8 @@ impl RssCache {
         key: &'a String,
         f: impl Fn(&'a str) -> F,
     ) -> F::Output
-    where
-        F: Future<Output = std::result::Result<Channel, Error>> + 'a,
+        where
+            F: Future<Output=std::result::Result<Channel, Error>> + 'a,
     {
         if let Some(channel) = self.get_channel(key) {
             return Ok(channel);
@@ -64,7 +68,7 @@ impl RssCache {
     }
 
     pub fn get_channel(&mut self, key: &String) -> Option<Channel> {
-        if let Some(value) = self.0.get(key) {
+        if let Some(value) = self.inner.get(key) {
             if Utc::now().timestamp() < value.expire {
                 return Some(value.channel.to_owned());
             }
@@ -75,7 +79,7 @@ impl RssCache {
     pub fn set_channel(&mut self, key: &String, channel: &Channel) {
         // let mut cache = self.channel.write().unwrap();
         let value = CachedChannel::new(channel);
-        self.0.put(key.to_owned(), value);
+        self.inner.insert(key.to_owned(), value);
         // cache.put(key.to_owned(), value);
     }
 
