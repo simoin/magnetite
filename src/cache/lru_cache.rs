@@ -3,6 +3,7 @@ use std::future::Future;
 use chrono::Utc;
 use dashmap::DashMap;
 use rss::Channel;
+use serde::{Deserialize, Serialize};
 
 use crate::config::CACHE_EXPIRE;
 use crate::error::Error;
@@ -15,6 +16,7 @@ pub struct RssCache {
 //     // resp: LruCache<String, CachedResponse>,
 // }
 
+#[derive(Serialize, Deserialize)]
 pub struct CachedChannel {
     channel: Channel,
     expire: i64,
@@ -26,11 +28,19 @@ pub struct CachedChannel {
 // }
 
 impl CachedChannel {
-    fn new(channel: &Channel) -> Self {
+    pub fn new(channel: &Channel) -> Self {
         CachedChannel {
             channel: channel.to_owned(),
             expire: Utc::now().timestamp() + CACHE_EXPIRE as i64,
         }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        Utc::now().timestamp() < self.expire
+    }
+
+    pub fn to_string(&self) -> String {
+        self.channel.to_string()
     }
 }
 
@@ -46,7 +56,7 @@ impl CachedChannel {
 impl RssCache {
     pub fn new() -> Self {
         RssCache {
-            inner: DashMap::with_capacity(20)
+            inner: DashMap::with_capacity(20),
         }
     }
 
@@ -55,8 +65,8 @@ impl RssCache {
         key: &'a String,
         f: impl Fn(&'a str) -> F,
     ) -> F::Output
-        where
-            F: Future<Output=std::result::Result<Channel, Error>> + 'a,
+    where
+        F: Future<Output = std::result::Result<Channel, Error>> + 'a,
     {
         if let Some(channel) = self.get_channel(key) {
             return Ok(channel);

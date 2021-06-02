@@ -3,9 +3,9 @@ use std::task::{Context, Poll};
 use crate::cache::RssCache;
 use actix_service::{Service, Transform};
 use actix_web::dev::{ServiceRequest, ServiceResponse};
-use actix_web::{http, Error, HttpResponse};
-use futures::future::{ok, Ready, Either};
 use actix_web::web::Data;
+use actix_web::{http, Error, HttpResponse};
+use futures::future::{ok, Either, Ready};
 use std::sync::Mutex;
 
 pub struct Cache;
@@ -41,7 +41,7 @@ where
     type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
     type Error = Error;
-    type Future =  Either<S::Future, Ready<Result<Self::Response, Self::Error>>>;
+    type Future = Either<S::Future, Ready<Result<Self::Response, Self::Error>>>;
 
     fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.service.poll_ready(ctx)

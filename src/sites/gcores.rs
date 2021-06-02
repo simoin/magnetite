@@ -1,14 +1,17 @@
+// use std::sync::Mutex;
+
+use actix_storage::Storage;
 use actix_web::{get, http, web, HttpResponse};
 use anyhow::Result;
 use libxml::xpath::Context;
 use rss::{Channel, Item};
 
-use crate::cache::RssCache;
+use crate::cache::lru_cache::CachedChannel;
+// use crate::cache::RssCache;
 use crate::error::Error;
 use crate::sites::{channel, item};
 use crate::util::{doc, new_img_node};
 use crate::{util::remove_node, CLIENT};
-use std::sync::Mutex;
 
 const BASE_URL: &str = "https://www.gcores.com";
 
@@ -121,17 +124,34 @@ async fn get_channel(url: &str) -> std::result::Result<Channel, Error> {
 #[get("/gcores/{category}")]
 pub async fn gcores(
     category: web::Path<(String,)>,
-    cache: web::Data<Mutex<RssCache>>,
+    // cache: web::Data<Mutex<RssCache>>,
+    storage: Storage,
 ) -> Result<HttpResponse, Error> {
     println!("category: {:?}", category);
     let category = category.into_inner().0;
     let url = format!("{}/{}", BASE_URL, &category);
     let key = format!("/gcores/{}", &category);
 
-    let channel = get_channel(&url).await?;
+    let channel = if let Some(channel) = storage.get::<_, CachedChannel>(&key).await.unwrap() {
+        if channel.is_valid() {
+            channel
+        } else {
+            let channel = get_channel(&url).await?;
+            let channel = CachedChannel::new(&channel);
+            storage.set(&key, &channel).await.unwrap();
+            channel
+        }
+    } else {
+        let channel = get_channel(&url).await?;
+        let channel = CachedChannel::new(&channel);
+        storage.set(&key, &channel).await.unwrap();
+        channel
+    };
 
-    let mut cache = cache.lock().unwrap();
-    cache.set_channel(&key, &channel);
+    // let channel = get_channel(&url).await?;
+
+    // let mut cache = cache.lock().unwrap();
+    // cache.set_channel(&key, &channel);
 
     Ok(HttpResponse::Ok()
         .header(http::header::CONTENT_TYPE, "application/xml")

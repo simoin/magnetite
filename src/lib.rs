@@ -3,7 +3,7 @@ pub mod cache;
 mod config;
 mod error;
 mod http;
-pub mod middleware;
+// pub mod middleware;
 mod services;
 mod sites;
 mod util;
