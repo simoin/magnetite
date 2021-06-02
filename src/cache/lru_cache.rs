@@ -2,20 +2,18 @@ use crate::config::CACHE_EXPIRE;
 use crate::error::Error;
 
 use chrono::Utc;
-use lazy_static::lazy_static;
 use lru::LruCache;
 use rss::Channel;
 
 use std::future::Future;
 use std::sync::RwLock;
 
-
 pub struct RssCache {
-    channel: RwLock<LruCache<String, CachedChannel>>,
-    resp: RwLock<LruCache<String, CachedResponse>>,
+    pub channel: LruCache<String, CachedChannel>,
+    resp: LruCache<String, CachedResponse>,
 }
 
-struct CachedChannel {
+pub struct CachedChannel {
     channel: Channel,
     expire: i64,
 }
@@ -27,20 +25,18 @@ struct CachedResponse {
 
 impl CachedChannel {
     fn new(channel: &Channel) -> Self {
-        let now = Utc::now().timestamp();
         CachedChannel {
             channel: channel.to_owned(),
-            expire: now + CACHE_EXPIRE as i64,
+            expire: Utc::now().timestamp() + CACHE_EXPIRE as i64,
         }
     }
 }
 
 impl CachedResponse {
     fn new(body: &str) -> Self {
-        let now = Utc::now().timestamp();
         CachedResponse {
             body: body.to_owned(),
-            expire: now + CACHE_EXPIRE as i64,
+            expire: Utc::now().timestamp() + CACHE_EXPIRE as i64,
         }
     }
 }
@@ -48,13 +44,15 @@ impl CachedResponse {
 impl RssCache {
     pub fn new() -> Self {
         RssCache {
-            channel: RwLock::new(LruCache::new(20)),
-            resp: RwLock::new(LruCache::new(20)),
+            channel: LruCache::new(20),
+            resp: LruCache::new(20),
         }
     }
 
     pub async fn try_get_channel<'a, F>(
-        &self, key: &'a String, f: impl Fn(&'a str) -> F,
+        &mut self,
+        key: &'a String,
+        f: impl Fn(&'a str) -> F,
     ) -> F::Output
     where
         F: Future<Output = std::result::Result<Channel, Error>> + 'a,
@@ -68,23 +66,27 @@ impl RssCache {
         Ok(channel)
     }
 
-    pub fn get_channel(&self, key: &String) -> Option<Channel> {
-        let mut cache = self.channel.write().unwrap();
-        if let Some(value) = (*cache).get(key) {
+    pub fn get_channel(&mut self, key: &String) -> Option<Channel> {
+        if let Some(value) = self.channel.get(key) {
+            eprintln!("Utc::now().timestamp() = {:#?}", Utc::now().timestamp());
+            eprintln!("value.expire = {:#?}", value.expire);
             if Utc::now().timestamp() < value.expire {
                 return Some(value.channel.to_owned());
             }
+        } else {
+            println!("get_channel. no cache")
         }
         None
     }
 
-    pub fn set_channel(&self, key: &String, channel: &Channel) {
-        let mut cache = self.channel.write().unwrap();
+    pub fn set_channel(&mut self, key: &String, channel: &Channel) {
+        // let mut cache = self.channel.write().unwrap();
         let value = CachedChannel::new(channel);
-        cache.put(key.to_owned(), value);
+        self.channel.put(key.to_owned(), value);
+        // cache.put(key.to_owned(), value);
     }
 
-    pub async fn try_get_resp<'a, F>(&self, key: &'a String, f: impl Fn(&'a str) -> F) -> F::Output
+    pub async fn try_get_resp<'a, F>(&mut self, key: &'a String, f: impl Fn(&'a str) -> F) -> F::Output
     where
         F: Future<Output = std::result::Result<String, Error>> + 'a,
     {
@@ -97,9 +99,9 @@ impl RssCache {
         Ok(resp)
     }
 
-    pub fn get_resp(&self, key: &String) -> Option<String> {
-        let mut cache = self.resp.write().unwrap();
-        if let Some(value) = (*cache).get(key) {
+    pub fn get_resp(&mut self, key: &String) -> Option<String> {
+        // let mut cache = self.resp.write().unwrap();
+        if let Some(value) =  self.resp.get(key) {
             if Utc::now().timestamp() < value.expire {
                 return Some(value.body.to_owned());
             }
@@ -107,9 +109,9 @@ impl RssCache {
         None
     }
 
-    pub fn set_resp(&self, key: &String, resp: &str) {
-        let mut cache = self.resp.write().unwrap();
+    pub fn set_resp(&mut self, key: &String, resp: &str) {
+        // let mut cache = self.resp.write().unwrap();
         let value = CachedResponse::new(resp);
-        cache.put(key.to_owned(), value);
+        self.resp.put(key.to_owned(), value);
     }
 }

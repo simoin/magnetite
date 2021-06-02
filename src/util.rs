@@ -21,7 +21,8 @@ pub fn doc<Bytes: AsRef<[u8]>>(input: Bytes) -> Document {
 }
 
 pub fn new_img_node(
-    doc: &Document, src: &str,
+    doc: &Document,
+    src: &str,
 ) -> std::result::Result<Node, Box<dyn std::error::Error>> {
     let mut img = Node::new("img", None, &doc).unwrap();
     img.set_attribute("src", src)?;
