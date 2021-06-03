@@ -1,16 +1,16 @@
-// use std::sync::Mutex;
+use std::time::Duration;
 
 use actix_storage::Storage;
-use actix_web::{get, http, HttpResponse, web};
+use actix_web::{get, http, web, HttpResponse};
 use anyhow::Result;
 use libxml::xpath::Context;
 use rss::{Channel, Item};
 
-use crate::CLIENT;
 use crate::cache::CachedChannel;
 use crate::error::Error;
 use crate::sites::{channel, item};
 use crate::util::{doc, new_img_node, remove_node};
+use crate::CLIENT;
 
 const BASE_URL: &str = "https://www.gcores.com";
 
@@ -121,8 +121,8 @@ async fn get_channel(url: &str) -> std::result::Result<Channel, Error> {
 }
 
 #[get("/gcores/{category}")]
-pub async fn gcores(
-    category: web::Path<(String, )>,
+pub async fn gcores_handle(
+    category: web::Path<(String,)>,
     // cache: web::Data<Mutex<RssCache>>,
     storage: Storage,
 ) -> Result<HttpResponse, Error> {
@@ -132,25 +132,34 @@ pub async fn gcores(
     let key = format!("/gcores/{}", &category);
 
     let channel = if let Some(channel) = storage.get::<_, CachedChannel>(&key).await.unwrap() {
-        if channel.is_valid() {
-            channel
+        if cfg!(feature = "memory") {
+            if channel.is_valid() {
+                channel
+            } else {
+                let channel = get_channel(&url).await?;
+                let channel = CachedChannel::new(&channel);
+                storage.set(&key, &channel).await.unwrap();
+                #[cfg(feature = "redis")]
+                storage
+                    .expire(&key, Duration::from_secs(60 * 10))
+                    .await
+                    .unwrap();
+                channel
+            }
         } else {
-            let channel = get_channel(&url).await?;
-            let channel = CachedChannel::new(&channel);
-            storage.set(&key, &channel).await.unwrap();
             channel
         }
     } else {
         let channel = get_channel(&url).await?;
         let channel = CachedChannel::new(&channel);
         storage.set(&key, &channel).await.unwrap();
+        #[cfg(feature = "redis")]
+        storage
+            .expire(&key, Duration::from_secs(60 * 10))
+            .await
+            .unwrap();
         channel
     };
-
-    // let channel = get_channel(&url).await?;
-
-    // let mut cache = cache.lock().unwrap();
-    // cache.set_channel(&key, &channel);
 
     Ok(HttpResponse::Ok()
         .header(http::header::CONTENT_TYPE, "application/xml")

@@ -3,15 +3,21 @@ use actix_storage::{Format, Storage};
 use actix_storage_dashmap::DashMapActor;
 #[cfg(feature = "redis")]
 use actix_storage_redis::{ConnectionAddr, ConnectionInfo, RedisBackend};
-use actix_web::{App, HttpServer};
+use actix_web::{web, App, HttpServer};
 
-use magnetite_rs::rss_service;
+use magnetite_rs::gcores;
 
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
-    #[cfg(feature = "memory")]
+#[cfg(feature = "memory")]
+fn rss_storage() -> Storage {
     let rss_store = DashMapActor::with_capacity(20).start(4);
-    #[cfg(feature = "redis")]
+    Storage::build()
+        .store(rss_store)
+        .format(Format::Json)
+        .finish()
+}
+
+#[cfg(feature = "redis")]
+async fn rss_storage() -> Storage {
     let rss_store = {
         let connection_info = ConnectionInfo {
             addr: ConnectionAddr::Tcp("192.168.31.127".to_string(), 6380).into(),
@@ -23,15 +29,23 @@ async fn main() -> std::io::Result<()> {
             .await
             .expect("Redis connection failed")
     };
-    let rss_storage = Storage::build()
-        .store(rss_store)
+    Storage::build()
+        .expiry_store(rss_store)
         .format(Format::Json)
-        .finish();
+        .finish()
+}
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    #[cfg(feature = "memory")]
+    let rss_storage = rss_storage();
+    #[cfg(feature = "redis")]
+    let rss_storage = rss_storage().await;
 
     HttpServer::new(move || {
         App::new()
             .app_data(rss_storage.clone())
-            .service(rss_service())
+            .service(web::scope("/").service(gcores::gcores_handle))
     })
     .bind("127.0.0.1:8080")?
     .run()
