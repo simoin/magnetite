@@ -3,30 +3,31 @@ name = "magnetite_rs"
 version = "0.1.0"
 authors = ["simoin <lfzeng34@gmail.com>"]
 edition = "2018"
+#resolver = "2"
 
 [dependencies]
 thiserror = "1.0"
 anyhow = "1.0"
 
-serde = {version="1", features = ["derive"]}
+serde = { version = "1", features = ["derive"] }
 #crossbeam-utils = "0.8.5"
 
 futures = "0.3.5"
-actix-service = "1.0"
-actix-web = "3.3.2"
+actix = "0.11"
+actix-web = "4.0.0-beta.6"
 
 lazy_static = "1.4.0"
-libxml = "0.2.17"
+libxml = "0.3"
 
-reqwest = { version = "0.10", features = ["cookies"] }
-ajson = "0.2.3"
+reqwest = { version = "0.11", features = ["cookies"] }
+ajson = "0.2.4"
 
 chrono = "0.4.15"
-rss = {version = "1.10.0", features = ["with-serde"] }
+rss = { version = "1.10.0", features = ["with-serde"] }
 
-actix-storage = { version = "0.2.0", features=["serde-json"] }
-actix-storage-dashmap = { version = "0.2.0", features=["actor"], optional = true }
-actix-storage-redis = { version = "0.2.0", features=["tls"] , optional = true}
+actix-storage = { path = "../../../GitHub/actix-storage/actix-storage", features = ["serde-json"] }
+actix-storage-dashmap = { path = "../../../GitHub/actix-storage/actix-storage-dashmap", features = ["actor"], optional = true }
+actix-storage-redis = { path = "../../../GitHub/actix-storage/actix-storage-redis", features = ["tls"], optional = true }
 
 [features]
 default = ["redis"]

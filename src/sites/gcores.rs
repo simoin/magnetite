@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use actix_storage::Storage;
 use actix_web::{get, http, web, HttpResponse};
 use anyhow::Result;
@@ -11,6 +9,7 @@ use crate::error::Error;
 use crate::sites::{channel, item};
 use crate::util::{doc, new_img_node, remove_node};
 use crate::CLIENT;
+use std::time::Duration;
 
 const BASE_URL: &str = "https://www.gcores.com";
 
@@ -162,6 +161,7 @@ pub async fn gcores_handle(
     };
 
     Ok(HttpResponse::Ok()
-        .header(http::header::CONTENT_TYPE, "application/xml")
+        .append_header((http::header::CONTENT_TYPE, "application/xml"))
         .body(channel.to_string()))
+    // channel.to_string().with_status(StatusCode::OK).with_header((http::header::CONTENT_TYPE, "application/xml"))
 }
