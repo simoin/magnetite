@@ -1,0 +1,37 @@
+[package]
+name = "magnetite_core"
+version = "0.1.0"
+authors = ["simoin <lfzeng34@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+thiserror = "1.0"
+anyhow = "1.0"
+
+serde = { version = "1", features = ["derive"] }
+#crossbeam-utils = "0.8.5"
+
+futures = "0.3.5"
+actix = "0.11"
+actix-web = "4.0.0-beta.6"
+
+lazy_static = "1.4.0"
+libxml = "0.3"
+
+reqwest = { version = "0.11", features = ["cookies"] }
+ajson = "0.2.4"
+
+chrono = "0.4.15"
+rss = { version = "1.10.0", features = ["with-serde"] }
+
+actix-storage = { path = "../../../../GitHub/actix-storage/actix-storage", features = ["serde-json"] }
+actix-storage-dashmap = { path = "../../../../GitHub/actix-storage/actix-storage-dashmap", features = ["actor"], optional = true }
+actix-storage-redis = { path = "../../../../GitHub/actix-storage/actix-storage-redis", features = ["tls"], optional = true }
+
+[features]
+default = ["redis"]
+
+memory = ["actix-storage-dashmap"]
+redis = ["actix-storage-redis"]

@@ -5,11 +5,12 @@ use actix_storage_dashmap::DashMapActor;
 use actix_storage_redis::{ConnectionAddr, ConnectionInfo, RedisBackend};
 use actix_web::{web, App, HttpServer};
 
-use magnetite_rs::gcores;
+use magnetite_core::gcores;
 
+// TODO use cfg-if
 #[cfg(feature = "memory")]
 fn rss_storage() -> Storage {
-    let rss_store = DashMapActor::with_capacity(20).start(4);
+    let rss_store = DashMapActor::with_capacity(20).start(2);
     Storage::build()
         .store(rss_store)
         .format(Format::Json)

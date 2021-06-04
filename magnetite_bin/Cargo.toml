@@ -1,0 +1,22 @@
+[package]
+name = "magnetite_bin"
+version = "0.1.0"
+authors = ["simoin <lfzeng34@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+actix-web = "4.0.0-beta.6"
+
+actix-storage = { path = "../../../../GitHub/actix-storage/actix-storage", features = ["serde-json"] }
+actix-storage-dashmap = { path = "../../../../GitHub/actix-storage/actix-storage-dashmap", features = ["actor"], optional = true }
+actix-storage-redis = { path = "../../../../GitHub/actix-storage/actix-storage-redis", features = ["tls"], optional = true }
+
+magnetite_core = {path="../magnetite_core" }
+
+[features]
+default = ["redis"]
+
+memory = ["actix-storage-dashmap"]
+redis = ["actix-storage-redis"]
