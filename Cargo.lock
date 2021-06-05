@@ -1090,6 +1090,18 @@ dependencies = [
 [[package]]
 name = "magnetite_cache"
 version = "0.1.0"
+dependencies = [
+ "actix",
+ "actix-web",
+ "async-trait",
+ "chrono",
+ "dashmap",
+ "log",
+ "redis",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
 
 [[package]]
 name = "magnetite_core"
@@ -1451,6 +1463,7 @@ dependencies = [
  "native-tls",
  "percent-encoding",
  "pin-project-lite",
+ "sha1",
  "tokio",
  "tokio-native-tls",
  "tokio-util",

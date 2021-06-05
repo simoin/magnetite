@@ -1,7 +1,9 @@
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+use std::sync::Arc;
+
+mod actor;
+mod error;
+mod storage;
+mod store;
+
+type Key = Arc<[u8]>;
+type Value = Arc<[u8]>;
