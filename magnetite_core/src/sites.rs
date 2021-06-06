@@ -1,4 +1,4 @@
-use crate::config::CACHE_EXPIRE;
+// use crate::config::CACHE_EXPIRE;
 use chrono::Utc;
 use rss::{Channel, ChannelBuilder, Guid, Item, ItemBuilder};
 
@@ -11,7 +11,7 @@ fn channel(title: String, url: String, items: Vec<Item>) -> Channel {
         .description("magnetite_rs")
         .language("zh-cn".to_string())
         .generator("magnetite_rs".to_string())
-        .ttl((CACHE_EXPIRE / 60).to_string())
+        .ttl("5".to_string())
         .last_build_date(Utc::now().to_rfc2822())
         .items(items)
         .build()

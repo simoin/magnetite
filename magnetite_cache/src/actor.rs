@@ -1,11 +1,13 @@
 use actix::{
-    dev::{MessageResponse, OneshotSender, ToEnvelope},
-    Actor, Addr, Handler, Message,
+    Actor,
+    Addr, dev::{MessageResponse, OneshotSender, ToEnvelope}, Handler, Message,
 };
 
+use crate::{Key, Value};
 use crate::error::{Result, StorageError};
 use crate::store::Store;
-use crate::{Key, Value};
+
+pub(crate) static CACHE_EXPIRE: usize = 5 * 60;
 
 #[derive(Debug, Message)]
 #[rtype(StoreResponse)]
@@ -35,9 +37,9 @@ impl<A: Actor> MessageResponse<A, StoreRequest> for StoreResponse {
 
 #[async_trait::async_trait]
 impl<T> Store for Addr<T>
-where
-    T: Actor + Handler<StoreRequest> + Sync + Send,
-    T::Context: ToEnvelope<T, StoreRequest>,
+    where
+        T: Actor + Handler<StoreRequest> + Sync + Send,
+        T::Context: ToEnvelope<T, StoreRequest>,
 {
     async fn set(&self, key: Key, value: Value) -> Result<()> {
         match self

@@ -10,19 +10,19 @@ edition = "2018"
 thiserror = "1.0"
 anyhow = "1.0"
 
-serde = { version = "1", features = ["derive"] }
+lazy_static = "1.4.0"
 
 futures = "0.3.5"
 actix = "0.11"
 actix-web = "4.0.0-beta.6"
 
-lazy_static = "1.4.0"
-libxml = "0.3"
+magnetite_cache = {path = "../magnetite_cache"}
 
 reqwest = { version = "0.11", features = ["cookies"] }
-ajson = "0.2.4"
+libxml = "0.3"
 
 chrono = "0.4.15"
+serde = { version = "1", features = ["derive"] }
+ajson = "0.2.4"
 rss = { version = "1.10.0", features = ["with-serde"] }
-
-magnetite_cache = {path = "../magnetite_cache"}
+dashmap = "4.0.0"

@@ -1,9 +1,8 @@
-use std::future::{ready, Future, Ready};
+use std::future::{ready, Ready};
 use std::sync::Arc;
 
-use actix_web::{FromRequest, HttpRequest, error::ErrorInternalServerError};
+use actix_web::{error::ErrorInternalServerError, FromRequest, HttpRequest};
 use actix_web::dev::Payload;
-use actix_web::error::Error;
 
 use crate::error::{Result, StorageError};
 use crate::store::Store;

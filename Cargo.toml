@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
     "magnetite_cache",
     "magnetite_core",

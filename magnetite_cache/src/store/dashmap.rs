@@ -4,7 +4,7 @@ use actix::{Actor, Addr, Handler, SyncArbiter, SyncContext};
 use chrono::Utc;
 use dashmap::DashMap;
 
-use crate::actor::{StoreRequest, StoreResponse};
+use crate::actor::{StoreRequest, StoreResponse, CACHE_EXPIRE};
 use crate::{Key, Value};
 
 #[derive(Debug)]
@@ -41,7 +41,7 @@ impl DashMapActor {
     pub fn with_capacity(capacity: usize) -> Self {
         DashMapActor {
             map: DashMap::with_capacity(capacity).into(),
-            ttl: 5 * 60,
+            ttl: CACHE_EXPIRE as i64,
         }
     }
 
@@ -51,7 +51,7 @@ impl DashMapActor {
     }
 
     pub fn start_default(threads: usize) -> Addr<Self> {
-        let storage = DashMapActor::new(5 * 60);
+        let storage = DashMapActor::new(CACHE_EXPIRE as i64);
         SyncArbiter::start(threads, move || storage.clone())
     }
 

@@ -2,7 +2,7 @@ use actix::{Actor, Context, Handler, ResponseActFuture, WrapFuture};
 use redis::aio::ConnectionManager;
 use redis::{AsyncCommands, ConnectionInfo};
 
-use crate::actor::{StoreRequest, StoreResponse};
+use crate::actor::{StoreRequest, StoreResponse, CACHE_EXPIRE};
 use crate::error::{Result, StorageError};
 
 const SCOPE: [u8; 9] = *b"RSS_CACHE";
@@ -45,7 +45,7 @@ impl RedisActorBuilder {
         let conn = client.get_tokio_connection_manager().await?;
         Ok(RedisActor {
             conn,
-            ttl: self.ttl.unwrap_or(5 * 60),
+            ttl: self.ttl.unwrap_or(CACHE_EXPIRE),
         })
     }
 }
@@ -61,7 +61,7 @@ impl RedisActor {
     pub async fn connect(conn_info: ConnectionInfo) -> Result<Self> {
         let client = redis::Client::open(conn_info)?;
         let conn = client.get_tokio_connection_manager().await?;
-        Ok(RedisActor { conn, ttl: 5 * 60 })
+        Ok(RedisActor { conn, ttl: CACHE_EXPIRE })
     }
 }
 
