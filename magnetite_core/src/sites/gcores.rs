@@ -1,21 +1,22 @@
 use actix_web::{get, http, web, HttpResponse};
-use anyhow::Result;
 use libxml::xpath::Context;
 use rss::{Channel, Item};
 
 use magnetite_cache::Storage;
 
-use crate::error::Error;
-use crate::sites::{channel, item};
-use crate::util::{doc, new_img_node, remove_node};
-use crate::CLIENT;
+use crate::util::ajson_get;
+use crate::{
+    error::{CustomError, Result},
+    sites::{channel, item},
+    util::{document, new_img_node, remove_node},
+    CLIENT,
+};
 
 const BASE_URL: &str = "https://www.gcores.com";
 
-async fn get_item(
-    url: String,
-    title: String,
-) -> std::result::Result<Item, Box<dyn std::error::Error>> {
+// TODO remove all Option::unwrap, replace Error::unwrap with `?`
+
+async fn get_item(url: String, title: String) -> Result<Item> {
     let item_url = format!("{}{}", BASE_URL, url);
     println!("{}", item_url);
 
@@ -23,8 +24,8 @@ async fn get_item(
     let gapi_resp = CLIENT.get(&api_url).send().await?.text().await?;
     let article_resp = CLIENT.get(&item_url).send().await?.bytes().await?;
 
-    let doc = doc(article_resp);
-    let context = Context::new(&doc).unwrap();
+    let doc = document(article_resp)?;
+    let context = Context::new(&doc).custom_err("create context failed")?;
     let images = {
         let attr_content = ajson::get(&gapi_resp, "data.attributes.content").unwrap();
         let attr_content = attr_content.as_str();
@@ -61,27 +62,42 @@ async fn get_item(
         if let Some(image) = images.get(index) {
             let mut parent = node.get_parent().unwrap();
             let img = new_img_node(&doc, &image.1)?;
-            parent.replace_child_node(img, node)?;
+            parent
+                .replace_child_node(img, node)
+                .custom_err("replace node failed")?;
         }
     }
 
     // remove md-editor-toolbar
-    remove_node(&context, "//div[@class='md-editor-toolbar']");
-    remove_node(&context, "//*[@class='story_hidden']");
-    remove_node(&context, "//svg");
+    remove_node(&context, "//div[@class='md-editor-toolbar']")?;
+    remove_node(&context, "//*[@class='story_hidden']")?;
+    remove_node(&context, "//svg")?;
 
     let content = context
         .evaluate("//div[@class='story story-show']")
         .unwrap()
         .get_nodes_as_vec();
 
+    let _ = ajson_get(&gapi_resp, "data.attributes.cover").map(|cover_url| {
+        let _ = new_img_node(
+            &doc,
+            format!("https://image.gcores.com/{}", cover_url).as_str(),
+        )
+        .map(|mut cover_node| {
+            content.get(0).map(|node| {
+                node.get_first_child()
+                    .map(|mut child| child.add_prev_sibling(&mut cover_node))
+            });
+        });
+    });
+
     Ok(item(title, item_url, doc.node_to_string(&content[0])))
 }
 
-async fn get_channel(url: &str) -> std::result::Result<Channel, Error> {
+async fn get_channel(url: &str) -> Result<Channel> {
     println!("{}", url);
     let resp = CLIENT.get(url).send().await?.bytes().await?;
-    let doc = doc(resp);
+    let doc = document(resp)?;
     let context = Context::new(&doc).unwrap();
     let item_node = context
         .evaluate("//div[contains(@class,'original-normal') and contains(@class,'am_card')]")
@@ -122,23 +138,17 @@ async fn get_channel(url: &str) -> std::result::Result<Channel, Error> {
 pub async fn gcores_handle(
     category: web::Path<(String,)>,
     storage: Storage,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse> {
     println!("category: {:?}", category);
     let category = category.into_inner().0;
     let url = format!("{}/{}", BASE_URL, &category);
     let key = format!("/gcores/{}", &category);
 
-    let channel =  if let Some(channel) = storage
-        .get::<_, Channel>(&key)
-        .await
-        .unwrap() {
+    let channel = if let Some(channel) = storage.get::<_, Channel>(&key).await.unwrap() {
         channel
     } else {
         let channel = get_channel(&url).await?;
-        storage
-            .set(&key, &channel)
-            .await
-            .unwrap();
+        storage.set(&key, &channel).await.unwrap();
         channel
     };
 

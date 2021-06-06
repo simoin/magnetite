@@ -61,7 +61,10 @@ impl RedisActor {
     pub async fn connect(conn_info: ConnectionInfo) -> Result<Self> {
         let client = redis::Client::open(conn_info)?;
         let conn = client.get_tokio_connection_manager().await?;
-        Ok(RedisActor { conn, ttl: CACHE_EXPIRE })
+        Ok(RedisActor {
+            conn,
+            ttl: CACHE_EXPIRE,
+        })
     }
 }
 
