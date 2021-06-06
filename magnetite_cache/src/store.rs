@@ -1,5 +1,5 @@
-mod dashmap;
-mod redis;
+pub mod dashmap;
+pub mod redis;
 
 use crate::error::Result;
 use crate::{Key, Value};

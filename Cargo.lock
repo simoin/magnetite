@@ -147,42 +147,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "actix-storage"
-version = "0.2.0"
-dependencies = [
- "actix",
- "actix-web",
- "async-trait",
- "log",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "actix-storage-dashmap"
-version = "0.2.0"
-dependencies = [
- "actix",
- "actix-storage",
- "async-trait",
- "dashmap",
- "delay-queue",
- "thiserror",
-]
-
-[[package]]
-name = "actix-storage-redis"
-version = "0.2.0"
-dependencies = [
- "actix",
- "actix-storage",
- "async-trait",
- "redis",
- "thiserror",
-]
-
-[[package]]
 name = "actix-tls"
 version = "3.0.0-beta.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -602,12 +566,6 @@ dependencies = [
  "cfg-if",
  "num_cpus",
 ]
-
-[[package]]
-name = "delay-queue"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4feac4ffcbc741236ab6ec6dc898c6889ac8b54c6a3378a9e81de233e12a8a9"
 
 [[package]]
 name = "derive_builder"
@@ -1080,10 +1038,9 @@ dependencies = [
 name = "magnetite_bin"
 version = "0.1.0"
 dependencies = [
- "actix-storage",
- "actix-storage-dashmap",
- "actix-storage-redis",
+ "actix",
  "actix-web",
+ "magnetite_cache",
  "magnetite_core",
 ]
 
@@ -1095,6 +1052,7 @@ dependencies = [
  "actix-rt",
  "actix-web",
  "async-trait",
+ "cfg-if",
  "chrono",
  "dashmap",
  "log",
@@ -1109,9 +1067,6 @@ name = "magnetite_core"
 version = "0.1.0"
 dependencies = [
  "actix",
- "actix-storage",
- "actix-storage-dashmap",
- "actix-storage-redis",
  "actix-web",
  "ajson",
  "anyhow",
@@ -1119,6 +1074,7 @@ dependencies = [
  "futures",
  "lazy_static",
  "libxml",
+ "magnetite_cache",
  "reqwest",
  "rss",
  "serde",

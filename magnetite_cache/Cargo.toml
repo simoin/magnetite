@@ -15,12 +15,14 @@ async-trait = "0.1"
 log = "0.4"
 
 thiserror = "1"
+
+cfg-if = "1.0.0"
+
 chrono = "0.4"
 dashmap = "4.0.0"
-redis = {version = "0.20.1", features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"] }
-
+redis = { version = "0.20.1", features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"] }
 serde = "1.0"
 serde_json = "1.0"
 
 [dev-dependencies]
-actix-rt="2.2"
+actix-rt = "2.2"

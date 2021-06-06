@@ -6,7 +6,7 @@ use crate::config::CACHE_EXPIRE;
 
 #[derive(Serialize, Deserialize)]
 pub struct CachedChannel {
-    channel: Channel,
+    pub channel: Channel,
     expire: i64,
 }
 

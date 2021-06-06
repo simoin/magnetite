@@ -21,16 +21,47 @@ pub struct RedisActor {
     ttl: usize,
 }
 
+pub struct RedisActorBuilder {
+    conn: Option<ConnectionInfo>,
+    ttl: Option<usize>,
+}
+
+impl RedisActorBuilder {
+    pub fn conn_info(mut self, conn_info: ConnectionInfo) -> Self {
+        self.conn = Some(conn_info);
+        self
+    }
+
+    pub fn with_ttl(mut self, ttl: usize) -> Self {
+        self.ttl = Some(ttl);
+        self
+    }
+
+    pub async fn finish(self) -> Result<RedisActor> {
+        if self.conn.is_none() {
+            panic!("conn_info is none")
+        }
+        let client = redis::Client::open(self.conn.unwrap())?;
+        let conn = client.get_tokio_connection_manager().await?;
+        Ok(RedisActor {
+            conn,
+            ttl: self.ttl.unwrap_or(5 * 60),
+        })
+    }
+}
+
 impl RedisActor {
+    pub fn new() -> RedisActorBuilder {
+        RedisActorBuilder {
+            conn: None,
+            ttl: None,
+        }
+    }
+
     pub async fn connect(conn_info: ConnectionInfo) -> Result<Self> {
         let client = redis::Client::open(conn_info)?;
         let conn = client.get_tokio_connection_manager().await?;
         Ok(RedisActor { conn, ttl: 5 * 60 })
-    }
-
-    pub fn set_ttl(mut self, ttl: usize) -> Self {
-        self.ttl = ttl;
-        self
     }
 }
 
@@ -59,8 +90,14 @@ async fn msg_handle(mut conn: ConnectionManager, ttl: usize, msg: StoreRequest) 
             let full_key = get_full_key(key);
             let res = conn.get(full_key).await;
             StoreResponse::Get(
-                res.map(|val: Vec<u8>| Some(val.into()))
-                    .map_err(|err| StorageError::RedisError(err)),
+                res.map(|val: Vec<u8>| {
+                    if !val.is_empty() {
+                        Some(val.into())
+                    } else {
+                        None
+                    }
+                })
+                .map_err(|err| StorageError::RedisError(err)),
             )
         }
         StoreRequest::Delete(key) => {
@@ -68,5 +105,57 @@ async fn msg_handle(mut conn: ConnectionManager, ttl: usize, msg: StoreRequest) 
             let res = conn.del(full_key).await;
             StoreResponse::Delete(res.map_err(|err| StorageError::RedisError(err)))
         }
+    }
+}
+
+#[cfg(test)]
+mod redis_test {
+    use actix::Actor;
+    use redis::{ConnectionAddr, ConnectionInfo};
+
+    use crate::error::Result;
+    use crate::storage::Storage;
+    use crate::store::redis::RedisActor;
+    use actix_rt::time::sleep;
+    use std::time::Duration;
+
+    #[test]
+    fn test() {
+        let system = actix_rt::System::new();
+        let store = system.block_on(async {
+            let redis = RedisActor::new()
+                .conn_info(ConnectionInfo {
+                    addr: ConnectionAddr::Tcp("192.168.31.127".to_string(), 6380).into(),
+                    db: 1,
+                    username: None,
+                    passwd: None,
+                })
+                .with_ttl(1)
+                .finish()
+                .await
+                .unwrap();
+            redis.start()
+        });
+        let storage = Storage::new(store);
+
+        system.block_on(async move {
+            let key = "key";
+            let value = "value".to_string();
+
+            assert!(storage.set(key.as_bytes(), &value).await.is_ok());
+
+            let get_res = storage.get(key).await;
+            assert!(get_res.is_ok());
+            assert_eq!(get_res.unwrap(), Some(value.clone()));
+
+            assert!(storage.delete(key.as_bytes()).await.is_ok());
+            let get_res: Result<Option<String>> = storage.get(key).await;
+            assert_eq!(get_res.unwrap(), None);
+
+            assert!(storage.set(key.as_bytes(), &value).await.is_ok());
+            sleep(Duration::from_secs(2)).await;
+            let get_res: Result<Option<String>> = storage.get(key).await;
+            assert_eq!(get_res.unwrap(), None);
+        });
     }
 }

@@ -1,15 +1,17 @@
-use actix_storage::Storage;
+use std::time::Duration;
+
 use actix_web::{get, http, web, HttpResponse};
 use anyhow::Result;
 use libxml::xpath::Context;
 use rss::{Channel, Item};
+
+use magnetite_cache::Storage;
 
 use crate::cache::CachedChannel;
 use crate::error::Error;
 use crate::sites::{channel, item};
 use crate::util::{doc, new_img_node, remove_node};
 use crate::CLIENT;
-use std::time::Duration;
 
 const BASE_URL: &str = "https://www.gcores.com";
 
@@ -130,35 +132,65 @@ pub async fn gcores_handle(
     let url = format!("{}/{}", BASE_URL, &category);
     let key = format!("/gcores/{}", &category);
 
-    let channel = if let Some(channel) = storage.get::<_, CachedChannel>(&key).await.unwrap() {
-        if cfg!(feature = "memory") {
-            if channel.is_valid() {
-                channel
-            } else {
-                let channel = get_channel(&url).await?;
-                let channel = CachedChannel::new(&channel);
-                storage.set(&key, &channel).await.unwrap();
-                #[cfg(feature = "redis")]
-                storage
-                    .expire(&key, Duration::from_secs(60 * 10))
-                    .await
-                    .unwrap();
-                channel
-            }
-        } else {
-            channel
-        }
+    // let channel = storage
+    //     .get::<_, CachedChannel>(&key)
+    //     .await
+    //     .unwrap()
+    //     .map_or_else(
+    //         async || {
+    //             let channel = get_channel(&url).await?;
+    //             storage
+    //                 .set(&key, &CachedChannel::new(&channel))
+    //                 .await
+    //                 .unwrap();
+    //             channel
+    //         },
+    //         |val| val.channel,
+    //     );
+
+    let channel =  if let Some(channel) = storage
+        .get::<_, CachedChannel>(&key)
+        .await
+        .unwrap() {
+        channel.channel
     } else {
         let channel = get_channel(&url).await?;
-        let channel = CachedChannel::new(&channel);
-        storage.set(&key, &channel).await.unwrap();
-        #[cfg(feature = "redis")]
         storage
-            .expire(&key, Duration::from_secs(60 * 10))
+            .set(&key, &CachedChannel::new(&channel))
             .await
             .unwrap();
         channel
     };
+
+    // let channel = if let Some(channel) = storage.get::<_, CachedChannel>(&key).await.unwrap() {
+    //     if cfg!(feature = "memory") {
+    //         if channel.is_valid() {
+    //             channel
+    //         } else {
+    //             let channel = get_channel(&url).await?;
+    //             let channel = CachedChannel::new(&channel);
+    //             storage.set(&key, &channel).await.unwrap();
+    //             #[cfg(feature = "redis")]
+    //             storage
+    //                 .expire(&key, Duration::from_secs(60 * 10))
+    //                 .await
+    //                 .unwrap();
+    //             channel
+    //         }
+    //     } else {
+    //         channel
+    //     }
+    // } else {
+    //     let channel = get_channel(&url).await?;
+    //     let channel = CachedChannel::new(&channel);
+    //     storage.set(&key, &channel).await.unwrap();
+    //     #[cfg(feature = "redis")]
+    //     storage
+    //         .expire(&key, Duration::from_secs(60 * 10))
+    //         .await
+    //         .unwrap();
+    //     channel
+    // };
 
     Ok(HttpResponse::Ok()
         .append_header((http::header::CONTENT_TYPE, "application/xml"))
