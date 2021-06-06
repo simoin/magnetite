@@ -1,21 +1,15 @@
-use std::borrow::Borrow;
-use std::sync::Arc;
-
-use actix::{Actor, ActorFutureExt, Addr, Context, Handler, ResponseActFuture, WrapFuture};
-use actix::dev::MessageResponse;
-use dashmap::DashMap;
-use redis::{AsyncCommands, ConnectionInfo, RedisResult};
+use actix::{Actor, Context, Handler, ResponseActFuture, WrapFuture};
 use redis::aio::ConnectionManager;
+use redis::{AsyncCommands, ConnectionInfo};
 
-use crate::{Key, Value};
 use crate::actor::{StoreRequest, StoreResponse};
 use crate::error::{Result, StorageError};
 
 const SCOPE: [u8; 9] = *b"RSS_CACHE";
 
 fn get_full_key<K>(key: K) -> Vec<u8>
-    where
-        K: AsRef<[u8]>,
+where
+    K: AsRef<[u8]>,
 {
     [SCOPE.as_ref(), b":", key.as_ref()].concat()
 }
@@ -42,14 +36,6 @@ impl RedisActor {
 
 impl Actor for RedisActor {
     type Context = Context<Self>;
-
-    fn started(&mut self, _: &mut Self::Context) {
-        println!("Actor is alive");
-    }
-
-    fn stopped(&mut self, _: &mut Self::Context) {
-        println!("Actor is stopped");
-    }
 }
 
 impl Handler<StoreRequest> for RedisActor {
@@ -58,9 +44,7 @@ impl Handler<StoreRequest> for RedisActor {
     fn handle(&mut self, msg: StoreRequest, _: &mut Self::Context) -> Self::Result {
         let conn = self.conn.clone();
         let ttl = self.ttl;
-        Box::pin(async move {
-            msg_handle(conn, ttl, msg).await
-        }.into_actor(self))
+        Box::pin(async move { msg_handle(conn, ttl, msg).await }.into_actor(self))
     }
 }
 
@@ -68,9 +52,7 @@ async fn msg_handle(mut conn: ConnectionManager, ttl: usize, msg: StoreRequest) 
     match msg {
         StoreRequest::Set(key, value) => {
             let full_key = get_full_key(key);
-            let res = conn
-                .set_ex(full_key, value.as_ref(), ttl)
-                .await;
+            let res = conn.set_ex(full_key, value.as_ref(), ttl).await;
             StoreResponse::Set(res.map_err(|err| StorageError::RedisError(err)))
         }
         StoreRequest::Get(key) => {

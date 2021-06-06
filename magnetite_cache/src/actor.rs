@@ -13,14 +13,12 @@ pub enum StoreRequest {
     Get(Key),
     Set(Key, Value),
     Delete(Key),
-    // Contains(Key),
 }
 
 pub enum StoreResponse {
     Get(Result<Option<Value>>),
     Set(Result<()>),
     Delete(Result<()>),
-    // Contains(Result<bool>),
 }
 
 impl<A: Actor> MessageResponse<A, StoreRequest> for StoreResponse {

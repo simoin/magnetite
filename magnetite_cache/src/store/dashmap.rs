@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
-use actix::dev::MessageResponse;
 use actix::{Actor, Addr, Handler, SyncArbiter, SyncContext};
+use chrono::Utc;
 use dashmap::DashMap;
 
 use crate::actor::{StoreRequest, StoreResponse};
 use crate::{Key, Value};
 
+#[derive(Debug)]
 struct DashMapValue {
     bytes: Value,
     // utc tz
@@ -25,21 +26,32 @@ impl DashMapValue {
 #[derive(Clone, Default)]
 pub struct DashMapActor {
     map: Arc<DashMap<Key, DashMapValue>>,
+    // default: 5 * 60
+    ttl: i64,
 }
 
 impl DashMapActor {
-    pub fn new() -> Self {
-        DashMapActor::default()
+    pub fn new(ttl: i64) -> Self {
+        DashMapActor {
+            ttl,
+            ..Default::default()
+        }
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
         DashMapActor {
             map: DashMap::with_capacity(capacity).into(),
+            ttl: 5 * 60,
         }
     }
 
+    pub fn set_ttl(mut self, ttl: i64) -> Self {
+        self.ttl = ttl;
+        self
+    }
+
     pub fn start_default(threads: usize) -> Addr<Self> {
-        let storage = DashMapActor::default();
+        let storage = DashMapActor::new(5 * 60);
         SyncArbiter::start(threads, move || storage.clone())
     }
 
@@ -50,14 +62,6 @@ impl DashMapActor {
 
 impl Actor for DashMapActor {
     type Context = SyncContext<Self>;
-
-    fn started(&mut self, _: &mut Self::Context) {
-        println!("Actor is alive");
-    }
-
-    fn stopped(&mut self, _: &mut Self::Context) {
-        println!("Actor is stopped");
-    }
 }
 
 impl Handler<StoreRequest> for DashMapActor {
@@ -76,8 +80,13 @@ impl Handler<StoreRequest> for DashMapActor {
                 StoreResponse::Set(Ok(()))
             }
             StoreRequest::Get(key) => {
-                // TODO check expire
-                let value = self.map.get(&key).map(|val| val.bytes.clone());
+                let value = self.map.get(&key).map_or(None, |val| {
+                    if val.create_at + self.ttl > Utc::now().timestamp() {
+                        Some(val.bytes.clone())
+                    } else {
+                        None
+                    }
+                });
                 StoreResponse::Get(Ok(value))
             }
             StoreRequest::Delete(key) => {
@@ -85,5 +94,34 @@ impl Handler<StoreRequest> for DashMapActor {
                 StoreResponse::Delete(Ok(()))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod dashmap_test {
+    use crate::error::Result;
+    use crate::storage::Storage;
+    use crate::store::dashmap::DashMapActor;
+
+    #[test]
+    fn test() {
+        let system = actix_rt::System::new();
+        let store = system.block_on(async { DashMapActor::new(600).start(1) });
+        let storage = Storage::new(store);
+
+        system.block_on(async move {
+            let key = "key";
+            let value = "value".to_string();
+
+            assert!(storage.set(key.as_bytes(), &value).await.is_ok());
+
+            let get_res = storage.get(key).await;
+            assert!(get_res.is_ok());
+            assert_eq!(get_res.unwrap(), Some(value));
+
+            assert!(storage.delete(key.as_bytes()).await.is_ok());
+            let get_res: Result<Option<String>> = storage.get(key).await;
+            assert_eq!(get_res.unwrap(), None);
+        });
     }
 }
