@@ -1,11 +1,12 @@
 use std::future::{ready, Ready};
 use std::sync::Arc;
 
-use actix_web::dev::Payload;
-use actix_web::{error::ErrorInternalServerError, FromRequest, HttpRequest};
+use actix_web::{dev::Payload, error::ErrorInternalServerError, FromRequest, HttpRequest};
 
-use crate::error::{Result, StorageError};
-use crate::store::Store;
+use crate::{
+    error::{Result, StorageError},
+    store::Store,
+};
 
 #[derive(Clone)]
 pub struct Storage {

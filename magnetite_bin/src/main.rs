@@ -1,5 +1,5 @@
 mod app_config;
-
+use simple_logger::SimpleLogger;
 use actix_web::{web, App, HttpServer};
 use config::Config;
 
@@ -8,8 +8,10 @@ use magnetite_core::gcores;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    SimpleLogger::new().init().unwrap();
+
     #[cfg(feature = "memory")]
-    let rss_storage = dashmap_storage(600);
+    let rss_storage = dashmap_storage(5);
     #[cfg(feature = "redis")]
     let rss_storage = {
         let conn_info = ConnectionInfo {

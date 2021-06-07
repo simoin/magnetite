@@ -1,9 +1,10 @@
 use actix::{Actor, Context, Handler, ResponseActFuture, WrapFuture};
-use redis::aio::ConnectionManager;
-use redis::{AsyncCommands, ConnectionInfo};
+use redis::{aio::ConnectionManager, AsyncCommands, ConnectionInfo};
 
-use crate::actor::{StoreRequest, StoreResponse, CACHE_EXPIRE};
-use crate::error::{Result, StorageError};
+use crate::{
+    actor::{StoreRequest, StoreResponse, CACHE_EXPIRE},
+    error::{Result, StorageError},
+};
 
 const SCOPE: [u8; 9] = *b"RSS_CACHE";
 

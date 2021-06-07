@@ -1,8 +1,7 @@
 pub mod dashmap;
 pub mod redis;
 
-use crate::error::Result;
-use crate::{Key, Value};
+use crate::{error::Result, Key, Value};
 
 /// Set of method for basic storage providers to implement.
 #[async_trait::async_trait]

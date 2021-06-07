@@ -7,6 +7,8 @@ pub enum Error {
     Reqwest(#[from] reqwest::Error),
     #[error("xml parser: {0}")]
     XmlParseError(#[from] libxml::parser::XmlParseError),
+    #[error("cache: {0}")]
+    CacheError(#[from] magnetite_cache::error::StorageError),
     #[error("xml operate: {0}")]
     LibXMLError(String),
 }

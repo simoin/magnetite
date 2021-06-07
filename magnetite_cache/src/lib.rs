@@ -4,11 +4,10 @@ use actix::Actor;
 pub use redis::{ConnectionAddr, ConnectionInfo};
 
 pub use storage::Storage;
-use store::dashmap::DashMapActor;
-use store::redis::RedisActor;
+use store::{dashmap::DashMapActor, redis::RedisActor};
 
 mod actor;
-mod error;
+pub mod error;
 mod storage;
 mod store;
 

@@ -4,8 +4,10 @@ use actix::{Actor, Addr, Handler, SyncArbiter, SyncContext};
 use chrono::Utc;
 use dashmap::DashMap;
 
-use crate::actor::{StoreRequest, StoreResponse, CACHE_EXPIRE};
-use crate::{Key, Value};
+use crate::{
+    actor::{StoreRequest, StoreResponse, CACHE_EXPIRE},
+    Key, Value,
+};
 
 #[derive(Debug)]
 struct DashMapValue {
