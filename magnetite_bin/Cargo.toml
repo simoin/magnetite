@@ -14,10 +14,13 @@ magnetite_core = { path = "../magnetite_core" }
 magnetite_cache = { path = "../magnetite_cache" }
 
 config = { version = "0.11.0", default-features = false, features = ["toml"] }
+structopt = "0.3.21"
+directories = "3.0.2"
 
 simple_logger = "1.11.0"
 
 serde = "1.0"
+toml = "0.5.8"
 
 [features]
 default = ["memory"]

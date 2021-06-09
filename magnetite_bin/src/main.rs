@@ -1,34 +1,46 @@
-mod app_config;
-use simple_logger::SimpleLogger;
+use actix_web::web::Data;
 use actix_web::{web, App, HttpServer};
-use config::Config;
+use simple_logger::SimpleLogger;
+use structopt::StructOpt;
 
-use magnetite_cache::*;
+use app_config::AppConfig;
 use magnetite_core::gcores;
+
+use crate::app_config::{config_path, Opt};
+
+mod app_config;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // TODO use log4rs
     SimpleLogger::new().init().unwrap();
 
-    #[cfg(feature = "memory")]
-    let rss_storage = dashmap_storage(5);
-    #[cfg(feature = "redis")]
-    let rss_storage = {
-        let conn_info = ConnectionInfo {
-            addr: ConnectionAddr::Tcp("192.168.31.127".to_string(), 6380).into(),
-            db: 1,
-            username: None,
-            passwd: None,
+    let config = {
+        let opt: Opt = Opt::from_args();
+        eprintln!("opt = {:#?}", opt);
+        let config_path = if let Some(config_path) = opt.config {
+            config_path
+        } else {
+            config_path().unwrap()
         };
-        redis_storage(conn_info, Some(600)).await
+        AppConfig::from(config_path).unwrap()
     };
+    eprintln!("settings = {:#?}", config);
+
+    let addr = config.address();
+
+    let app_state = config.into_state();
+
+    let storage = app_state.storage().await;
+    let app_state = Data::new(app_state);
 
     HttpServer::new(move || {
         App::new()
-            .app_data(rss_storage.clone())
+            .app_data(app_state.clone())
+            .app_data(storage.clone())
             .service(web::scope("/").service(gcores::gcores_handle))
     })
-    .bind("127.0.0.1:8080")?
+    .bind(&addr)?
     .run()
     .await
 }

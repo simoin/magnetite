@@ -29,13 +29,13 @@ impl DashMapValue {
 pub struct DashMapActor {
     map: Arc<DashMap<Key, DashMapValue>>,
     // default: 5 * 60
-    ttl: i64,
+    expire: i64,
 }
 
 impl DashMapActor {
-    pub fn new(ttl: i64) -> Self {
+    pub fn new(expire: i64) -> Self {
         DashMapActor {
-            ttl,
+            expire,
             ..Default::default()
         }
     }
@@ -43,12 +43,12 @@ impl DashMapActor {
     pub fn with_capacity(capacity: usize) -> Self {
         DashMapActor {
             map: DashMap::with_capacity(capacity).into(),
-            ttl: CACHE_EXPIRE as i64,
+            expire: CACHE_EXPIRE as i64,
         }
     }
 
-    pub fn set_ttl(mut self, ttl: i64) -> Self {
-        self.ttl = ttl;
+    pub fn expire(mut self, expire: i64) -> Self {
+        self.expire = expire;
         self
     }
 
@@ -83,7 +83,7 @@ impl Handler<StoreRequest> for DashMapActor {
             }
             StoreRequest::Get(key) => {
                 let value = self.map.get(&key).map_or(None, |val| {
-                    if val.create_at + self.ttl > Utc::now().timestamp() {
+                    if val.create_at + self.expire > Utc::now().timestamp() {
                         Some(val.bytes.clone())
                     } else {
                         None

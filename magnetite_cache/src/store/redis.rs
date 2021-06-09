@@ -1,5 +1,5 @@
 use actix::{Actor, Context, Handler, ResponseActFuture, WrapFuture};
-use redis::{aio::ConnectionManager, AsyncCommands, ConnectionInfo};
+use redis::{aio::ConnectionManager, AsyncCommands, IntoConnectionInfo};
 
 use crate::{
     actor::{StoreRequest, StoreResponse, CACHE_EXPIRE},
@@ -19,34 +19,34 @@ where
 pub struct RedisActor {
     conn: ConnectionManager,
     // default: 5 * 60
-    ttl: usize,
+    expire: usize,
 }
 
 pub struct RedisActorBuilder {
-    conn: Option<ConnectionInfo>,
-    ttl: Option<usize>,
+    url: Option<String>,
+    expire: Option<usize>,
 }
 
 impl RedisActorBuilder {
-    pub fn conn_info(mut self, conn_info: ConnectionInfo) -> Self {
-        self.conn = Some(conn_info);
+    pub fn conn_info(mut self, url: String) -> Self {
+        self.url = Some(url);
         self
     }
 
-    pub fn with_ttl(mut self, ttl: usize) -> Self {
-        self.ttl = Some(ttl);
+    pub fn expire(mut self, expire: usize) -> Self {
+        self.expire = Some(expire);
         self
     }
 
     pub async fn finish(self) -> Result<RedisActor> {
-        if self.conn.is_none() {
-            panic!("conn_info is none")
+        if self.url.is_none() {
+            panic!("redis url is none")
         }
-        let client = redis::Client::open(self.conn.unwrap())?;
+        let client = redis::Client::open(self.url.unwrap())?;
         let conn = client.get_tokio_connection_manager().await?;
         Ok(RedisActor {
             conn,
-            ttl: self.ttl.unwrap_or(CACHE_EXPIRE),
+            expire: self.expire.unwrap_or(CACHE_EXPIRE),
         })
     }
 }
@@ -54,17 +54,17 @@ impl RedisActorBuilder {
 impl RedisActor {
     pub fn new() -> RedisActorBuilder {
         RedisActorBuilder {
-            conn: None,
-            ttl: None,
+            url: None,
+            expire: None,
         }
     }
 
-    pub async fn connect(conn_info: ConnectionInfo) -> Result<Self> {
+    pub async fn connect<T: IntoConnectionInfo>(conn_info: T) -> Result<Self> {
         let client = redis::Client::open(conn_info)?;
         let conn = client.get_tokio_connection_manager().await?;
         Ok(RedisActor {
             conn,
-            ttl: CACHE_EXPIRE,
+            expire: CACHE_EXPIRE,
         })
     }
 }
@@ -78,16 +78,20 @@ impl Handler<StoreRequest> for RedisActor {
 
     fn handle(&mut self, msg: StoreRequest, _: &mut Self::Context) -> Self::Result {
         let conn = self.conn.clone();
-        let ttl = self.ttl;
-        Box::pin(async move { msg_handle(conn, ttl, msg).await }.into_actor(self))
+        let expire = self.expire;
+        Box::pin(async move { msg_handle(conn, expire, msg).await }.into_actor(self))
     }
 }
 
-async fn msg_handle(mut conn: ConnectionManager, ttl: usize, msg: StoreRequest) -> StoreResponse {
+async fn msg_handle(
+    mut conn: ConnectionManager,
+    expire: usize,
+    msg: StoreRequest,
+) -> StoreResponse {
     match msg {
         StoreRequest::Set(key, value) => {
             let full_key = get_full_key(key);
-            let res = conn.set_ex(full_key, value.as_ref(), ttl).await;
+            let res = conn.set_ex(full_key, value.as_ref(), expire).await;
             StoreResponse::Set(res.map_err(|err| StorageError::RedisError(err)))
         }
         StoreRequest::Get(key) => {
@@ -114,14 +118,15 @@ async fn msg_handle(mut conn: ConnectionManager, ttl: usize, msg: StoreRequest) 
 
 #[cfg(test)]
 mod redis_test {
+    use std::time::Duration;
+
     use actix::Actor;
+    use actix_rt::time::sleep;
     use redis::{ConnectionAddr, ConnectionInfo};
 
     use crate::error::Result;
     use crate::storage::Storage;
     use crate::store::redis::RedisActor;
-    use actix_rt::time::sleep;
-    use std::time::Duration;
 
     #[test]
     fn test() {
@@ -134,7 +139,7 @@ mod redis_test {
                     username: None,
                     passwd: None,
                 })
-                .with_ttl(1)
+                .expire(1)
                 .finish()
                 .await
                 .unwrap();
