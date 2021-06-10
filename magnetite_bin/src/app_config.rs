@@ -11,6 +11,7 @@ use magnetite_core::state::AppState;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AppConfig {
     logger_level: String,
+    #[serde(skip)]
     config_path: PathBuf,
     proxy: Option<String>,
     server: Server,
@@ -40,7 +41,8 @@ impl Default for AppConfig {
             },
             cache: Cache {
                 expire: 5 * 60,
-                r#type: CacheType::Memory,
+                redis_url: Some("redis://192.168.31.127:6380/1".to_string()),
+                r#type: CacheType::Redis {},
             },
             logger_level: "INFO".to_string(),
             proxy: None,
@@ -56,7 +58,7 @@ impl Default for AppConfig {
 impl AppConfig {
     pub fn into_state(self) -> AppState {
         let redis = match &self.cache.r#type {
-            CacheType::Redis { url } => Some(url.clone()),
+            CacheType::Redis => Some(self.cache.redis_url.expect("redis url is missed")),
             CacheType::Memory => None,
         };
 
@@ -90,8 +92,9 @@ impl AppConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 enum CacheType {
-    Redis { url: String },
+    Redis,
     Memory,
 }
 
@@ -99,6 +102,8 @@ enum CacheType {
 struct Cache {
     expire: usize,
     r#type: CacheType,
+    #[serde(rename = "redis")]
+    redis_url: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

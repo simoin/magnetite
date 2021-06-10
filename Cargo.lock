@@ -1142,7 +1142,6 @@ dependencies = [
  "actix-web",
  "config",
  "directories",
- "magnetite_cache",
  "magnetite_core",
  "serde",
  "simple_logger",

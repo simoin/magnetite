@@ -11,7 +11,7 @@ pub struct AppState {
 impl AppState {
     pub async fn storage(&self) -> Storage {
         if let Some(redis_url) = &self.redis {
-            redis_storage(redis_url.parse().unwrap(), Some(self.cache_expire)).await
+            redis_storage(redis_url.parse().unwrap(), self.cache_expire).await
         } else {
             dashmap_storage(self.cache_expire)
         }

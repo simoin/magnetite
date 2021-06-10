@@ -19,10 +19,10 @@ pub fn dashmap_storage(cache_expire: usize) -> Storage {
     Storage::new(store)
 }
 
-pub async fn redis_storage(url: String, cache_expire: Option<usize>) -> Storage {
+pub async fn redis_storage(url: String, cache_expire: usize) -> Storage {
     let store = RedisActor::new()
         .conn_info(url)
-        .expire(cache_expire.unwrap())
+        .expire(cache_expire)
         .finish()
         .await
         .unwrap()

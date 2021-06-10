@@ -1,14 +1,14 @@
 use actix_web::{get, http, web, HttpResponse};
-use libxml::xpath::Context;
 use log::{debug, error, info};
 use rss::{Channel, Item};
 
 use magnetite_cache::Storage;
 
 use crate::{
-    error::{CustomError, Error, Result},
+    error::{Error, Result},
     sites::{channel, item},
-    util::{ajson_get, document, img_node, remove_node, text_node},
+    util::ajson_get,
+    xpath::Document,
     CLIENT,
 };
 
@@ -54,50 +54,45 @@ async fn get_item(url: String, title: String) -> Result<Item> {
     let gapi_resp = CLIENT.get(&api_url).send().await?.text().await?;
     let article_resp = CLIENT.get(&item_url).send().await?.bytes().await?;
 
-    let doc = document(article_resp)?;
-    let context = Context::new(&doc).custom_err("create context failed")?;
+    let doc = Document::from_bytes(article_resp)?;
 
     let images = get_images_info(&gapi_resp);
     if let Some(images) = images {
-        let figures = context
-            .evaluate("//figure")
-            .custom_err("evaluate //figure failed")?
-            .get_nodes_as_vec();
+        let figures = doc.evaluate("//figure")?;
         for (index, mut node) in figures.into_iter().enumerate() {
             if let Some(((cap, url), mut parent)) = images.get(index).zip(node.get_parent()) {
-                let mut text = text_node(&doc, cap)?;
-                node.add_next_sibling(&mut text)
-                    .custom_err("create image caption node failed")?;
+                let mut text = doc.create_node("p")?;
+                text.set_content(cap)?;
+                node.add_next_sibling(&mut text)?;
 
-                let img = img_node(&doc, url)?;
-                parent
-                    .replace_child_node(img, node)
-                    .custom_err("replace node failed")?;
+                let mut img = doc.create_node("img")?;
+                img.set_attribute("src", url)?;
+                parent.replace_child_node(img, node)?;
             }
         }
     }
 
     // remove md-editor-toolbar
-    remove_node(&context, "//div[@class='md-editor-toolbar']")?;
-    remove_node(&context, "//*[@class='story_hidden']")?;
-    remove_node(&context, "//svg")?;
+    doc.remove_node("//div[@class='md-editor-toolbar']")?;
+    doc.remove_node("//*[@class='story_hidden']")?;
+    doc.remove_node("//svg")?;
 
-    let content = context
-        .evaluate("//div[@class='story story-show']")
-        .custom_err("evaluate //div[@class='story story-show'] failed")?
-        .get_nodes_as_vec();
+    let content = doc.evaluate("//div[@class='story story-show']")?;
 
     ajson_get(&gapi_resp, "data.attributes.cover")
         .map(|cover_url| {
-            img_node(
-                &doc,
-                format!("https://image.gcores.com/{}", cover_url).as_str(),
-            )
-            .map(|mut cover_node| {
-                content.get(0).map(|node| {
-                    node.get_first_child()
-                        .map(|mut child| child.add_prev_sibling(&mut cover_node))
-                });
+            doc.create_node("img").map(|mut img| {
+                img.set_attribute(
+                    "src",
+                    format!("https://image.gcores.com/{}", cover_url).as_str(),
+                )
+                .and_then(|_| {
+                    content.get(0).map(|node| {
+                        node.get_first_child()
+                            .map(|mut child| child.add_prev_sibling(&mut img))
+                    });
+                    Ok(())
+                })
             })
         })
         .transpose()?;
@@ -108,35 +103,31 @@ async fn get_item(url: String, title: String) -> Result<Item> {
 async fn get_channel(url: &str) -> Result<Channel> {
     debug!(target: "get_channel", "url: {}", url);
     let resp = CLIENT.get(url).send().await?.bytes().await?;
-    let doc = document(resp)?;
-    let context = Context::new(&doc).custom_err("create context failed")?;
 
-    let title = context
-        .evaluate("//title")
-        .custom_err("evaluate channel title xpath failed")?
-        .get_nodes_as_vec()
+    let doc = Document::from_bytes(resp)?;
+    // let doc = document(resp)?;
+    // let context = Context::new(&doc).custom_err("create context failed")?;
+
+    let title = doc
+        .evaluate("//title")?
         .first()
-        .map(|node| node.get_content())
+        .map(|node| node.content())
         .ok_or(Error::LibXMLError("get channel title failed".to_string()))?;
 
-    let item_node = context
-        .evaluate("//div[contains(@class,'original-normal') and contains(@class,'am_card')]")
-        .custom_err("evaluate item_node xpath failed")?
-        .get_nodes_as_vec();
+    let item_node =
+        doc.evaluate("//div[contains(@class,'original-normal') and contains(@class,'am_card')]")?;
 
     let mut items = Vec::new();
     for node in item_node.iter() {
         let url = node
-            .findnodes(".//a[@class='original_imgArea_cover']/@href")
-            .custom_err("get item url failed")?
+            .find_nodes(".//a[@class='original_imgArea_cover']/@href")?
             .first()
-            .map(|node| node.get_content())
+            .map(|node| node.content())
             .ok_or(Error::LibXMLError("get item url failed".to_string()))?;
         let title = node
-            .findnodes(".//a[@class='am_card_content original_content']/h3/text()")
-            .custom_err("get item title failed")?
+            .find_nodes(".//a[@class='am_card_content original_content']/h3/text()")?
             .first()
-            .map(|node| node.get_content())
+            .map(|node| node.content())
             .ok_or(Error::LibXMLError("get item title failed".to_string()))?;
 
         let item = get_item(url, title).await?;

@@ -133,12 +133,7 @@ mod redis_test {
         let system = actix_rt::System::new();
         let store = system.block_on(async {
             let redis = RedisActor::new()
-                .conn_info(ConnectionInfo {
-                    addr: ConnectionAddr::Tcp("192.168.31.127".to_string(), 6380).into(),
-                    db: 1,
-                    username: None,
-                    passwd: None,
-                })
+                .conn_info("redis://192.168.31.127:6380/1".parse().unwrap())
                 .expire(1)
                 .finish()
                 .await
