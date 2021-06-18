@@ -1,12 +1,9 @@
-use actix_web::web::Data;
-use actix_web::{web, App, HttpServer};
+use actix_web::{web::Data, App, HttpServer};
 use simple_logger::SimpleLogger;
 use structopt::StructOpt;
 
-use app_config::AppConfig;
-use magnetite_core::gcores;
-
-use crate::app_config::{config_path, Opt};
+use app_config::{config_path, AppConfig, Opt};
+use magnetite_core::{scope, Cache};
 
 mod app_config;
 
@@ -31,14 +28,15 @@ async fn main() -> std::io::Result<()> {
 
     let app_state = config.into_state();
 
-    let storage = app_state.storage().await;
+    let storage = Data::new(app_state.storage().await);
     let app_state = Data::new(app_state);
 
     HttpServer::new(move || {
         App::new()
             .app_data(app_state.clone())
             .app_data(storage.clone())
-            .service(web::scope("/").service(gcores::gcores_handle))
+            .wrap(Cache)
+            .service(scope())
     })
     .bind(&addr)?
     .run()

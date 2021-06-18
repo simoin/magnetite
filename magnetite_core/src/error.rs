@@ -1,4 +1,7 @@
+use std::fmt::Debug;
+
 use actix_web::ResponseError;
+use log::error;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -21,8 +24,11 @@ pub(crate) trait CustomError<T> {
     fn custom_err(self, msg: &str) -> Result<T>;
 }
 
-impl<T, E> CustomError<T> for std::result::Result<T, E> {
+impl<T, E: Debug> CustomError<T> for std::result::Result<T, E> {
     fn custom_err(self, msg: &str) -> Result<T> {
-        self.map_err(|_| Error::LibXMLError(msg.to_owned()))
+        self.map_err(|e| {
+            error!(target: "libxml", "Error: {:#?}", e);
+            Error::LibXMLError(msg.to_owned())
+        })
     }
 }

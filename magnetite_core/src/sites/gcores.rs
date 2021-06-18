@@ -1,3 +1,4 @@
+use actix_web::web::Data;
 use actix_web::{get, http, web, HttpResponse};
 use log::{debug, error, info};
 use rss::{Channel, Item};
@@ -105,8 +106,6 @@ async fn get_channel(url: &str) -> Result<Channel> {
     let resp = CLIENT.get(url).send().await?.bytes().await?;
 
     let doc = Document::from_bytes(resp)?;
-    // let doc = document(resp)?;
-    // let context = Context::new(&doc).custom_err("create context failed")?;
 
     let title = doc
         .evaluate("//title")?
@@ -140,20 +139,15 @@ async fn get_channel(url: &str) -> Result<Channel> {
 #[get("/gcores/{category}")]
 pub async fn gcores_handle(
     category: web::Path<(String,)>,
-    storage: Storage,
+    storage: Data<Storage>,
 ) -> Result<HttpResponse> {
     debug!(target: "gcores_handle", "category: {:?}", category);
     let category = category.into_inner().0;
     let url = format!("{}/{}", BASE_URL, &category);
     let key = format!("/gcores/{}", &category);
 
-    let channel = if let Some(channel) = storage.get::<_, Channel>(&key).await? {
-        channel
-    } else {
-        let channel = get_channel(&url).await?;
-        storage.set(&key, &channel).await?;
-        channel
-    };
+    let channel = get_channel(&url).await?;
+    storage.set(&key, &channel).await?;
 
     Ok(HttpResponse::Ok()
         .append_header((http::header::CONTENT_TYPE, "application/xml"))
